@@ -10,5 +10,5 @@
 
 [submodule "sec"]
 	path = sec
-	url = https://github.com/aaalllexxx/sce.git
+	url = https://github.com/aaalllexxx/sec.git
 	branch = master
