@@ -7,3 +7,8 @@
 	path = APM
 	url = https://github.com/aaalllexxx/APM.git
 	branch = main
+
+[submodule "sec"]
+	path = sec
+	url = https://github.com/aaalllexxx/sce.git
+	branch = master
