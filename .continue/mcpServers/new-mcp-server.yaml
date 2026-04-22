@@ -1,0 +1,9 @@
+name: MCP Image Generator
+version: 1.0.0
+schema: v1
+mcpServers:
+  - name: img_generator
+    type: sse
+    url: https://questore.ru/sse
+    env: {}
+    timeout: 300000

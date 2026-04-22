@@ -1,0 +1,10 @@
+{
+    "debug": true,
+    "view": "web",
+    "host": "127.0.0.1",
+    "port": 5000,
+    "screen_path": "screens",
+    "routers": {
+        "/": "HomeScreen"
+    }
+}

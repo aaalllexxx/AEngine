@@ -1,0 +1,5 @@
+/pyinstaller_conf/
+global_config.json
+venv/
+executable/
+*kanban*
