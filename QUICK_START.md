@@ -2,6 +2,15 @@
 
 ## 🚀 Установка
 
+### 1. Клонирование
+
+```bash
+git clone --recursive https://github.com/aaalllexxx/AEngine.git
+cd AEngine
+```
+
+### 2. Установка APM
+
 ```bash
 cd APM/scripts
 setup.bat  # Windows
@@ -18,24 +27,26 @@ cd myproject
 
 ## 💻 Ваше первое приложение
 
-### main.py
+### main.py (синхронный вариант)
 ```python
-from AEngineApps.async_app import AsyncApp
-from AEngineApps.async_screen import AsyncScreen
+from AEngineApps.app import App
+from AEngineApps.screen import Screen
 
-class HomeScreen(AsyncScreen):
+class HomeScreen(Screen):
     route = "/"
     
-    async def run(self):
-        return await self.render("index.html", title="Hello AEngine!")
+    def run(self):
+        return self.render("index.html", title="Hello AEngine!")
 
-app = AsyncApp("MyApp")
+app = App("MyApp")
 app.load_config("config.json")
 app.add_screen("/", HomeScreen)
 
 if __name__ == "__main__":
     app.run()
 ```
+
+> **Примечание:** В корне проекта AEngine уже есть готовый [`main.py`](main.py) — единая точка входа приложения.
 
 ### config.json
 ```json
@@ -71,8 +82,9 @@ python main.py
 
 ## 🎯 Что дальше?
 
-- **Простые проекты?** Используйте синхронный `App` (см. AEngineApps/readme.md)
-- **Production?** Читайте PRODUCTION_GUIDE.md
+- **Production?** Читайте [PRODUCTION_GUIDE.md](PRODUCTION_GUIDE.md)
+- **Полный API?** Читайте [API_REFERENCE.md](API_REFERENCE.md)
 - **Безопасность?** Установите `apm install sec`
+- **Архитектура?** Читайте [ARCHITECTURE.md](ARCHITECTURE.md)
 
 **Всё! Вы готовы к разработке.**

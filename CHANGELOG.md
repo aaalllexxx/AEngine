@@ -5,6 +5,60 @@ All notable changes to AEngine project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.2.0] - 2026-06-01
+
+### Added
+- 🛡️ Security Demo Application (`security-demo/`) — интерактивное SPA для демонстрации возможностей модуля безопасности
+  - Вкладка "Attack Simulator": 8 типов атак (SQLi, XSS, LFI, RCE, DDoS, CVE, DLP, Attack Chain) с живой реакцией IPS/IDS
+  - Вкладка "Architecture": интерактивная SVG-схема архитектуры модуля sec
+  - Вкладка "Metrics Dashboard": мониторинг в реальном времени (Canvas-графики, логи событий, нагрузочные тесты)
+- Docker-контейнеризация демо-приложения (порт 5050)
+
+### Verified
+- ✅ Все модули проходят проверку импортов (18/18 компонентов)
+- ✅ 95 тестов pytest — все passed
+- ✅ APM CLI полностью функционален
+- ✅ Модуль sec: IPS/IDS, RateLimiter, DLP, OSProtection, SystemProtection — работают корректно
+
+---
+
+## [v3.1.0] - 2026-05-31
+
+### 🔒 Security
+- Удалены захардкоженные учётные данные из sec_config.py
+- Исправлена уязвимость Path Traversal в ClusterNode (tar.extractall)
+- Устранена Command Injection в auth.py (shell=True → shell=False)
+- Сравнение паролей через hmac.compare_digest (timing-safe)
+- Безопасный импорт psutil с graceful degradation
+
+### 🏗️ Architecture
+- Устранено дублирование кода между sec/ и sec/AEngineApps/
+- Добавлена потокобезопасность в GlobalStorage (RLock)
+- Оптимизирован JsonDict с batch_update() context manager
+- Создан main.py — единая точка входа приложения
+- Добавлен __init__.py для AEngineApps и sec/AEngineApps
+
+### 🐛 Bug Fixes
+- Исправлены ложные срабатывания XSS Detector
+- Исправлен ReDoS в DLP PhoneFilter
+- Устранена утечка файловых дескрипторов в App
+- Исправлен __all__ в ClusterNode
+- Удалён BOM из APM/requirements.txt
+
+### 📦 Infrastructure
+- Обновлены GitHub Actions до v4/v5
+- CI/CD: добавлен submodules: recursive
+- Dockerfile: исправлен HEALTHCHECK, CMD
+- docker-compose: добавлены healthchecks для Redis/PostgreSQL
+- Создан .dockerignore
+- Улучшена конфигурация nginx
+
+### 🧪 Tests
+- Полностью переписаны тесты (95 тестов)
+- Покрытие: App, Screen, API, Service, GlobalStorage, JsonDict, Security, main.py
+
+---
+
 ## [3.0.0] - 2026-03-19
 
 ### 🚀 Major Release - Production Enterprise Ready
@@ -109,13 +163,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ---
 
 ## Roadmap
-
-### [3.1.0] - Planned
-- [ ] GraphQL support module
-- [ ] WebSocket integration
-- [ ] ORM wrapper (SQLAlchemy)
-- [ ] Admin panel generator
-- [ ] Internationalization (i18n)
 
 ### [3.2.0] - Planned
 - [ ] Real-time monitoring dashboard

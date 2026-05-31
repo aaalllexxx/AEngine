@@ -2,7 +2,7 @@
 
 <div align="center">
 
-![Version](https://img.shields.io/badge/version-2.2-blue.svg)
+![Version](https://img.shields.io/badge/version-3.0.0-blue.svg)
 ![Python](https://img.shields.io/badge/python-3.8+-green.svg)
 ![License](https://img.shields.io/badge/license-MIT-orange.svg)
 
@@ -39,6 +39,7 @@
 
 - **AEngineApps** — легковесный OOP-фреймворк без декораторов (независимый проект)
 - **APM** (AEngine Package Manager) — мощный менеджер проектов и модулей (независимый проект)
+- **sec** — модуль комплексной безопасности (IDS/IPS, DLP, кластеризация, dashboard)
 
 
 ### Философия проекта
@@ -83,28 +84,33 @@
 
 ```
 AEngine/
-├── AEngineApps/          # Основной фреймворк
+├── AEngineApps/          # Основной фреймворк (submodule)
+│   ├── __init__.py       # Инициализация пакета
 │   ├── app.py            # Класс App (ядро приложения)
 │   ├── screen.py         # Базовый класс Screen
 │   ├── api.py            # Класс API для REST
 │   ├── service.py        # Класс Service для микросервисов
-│   ├── async_app.py      # Асинхронная версия App
-│   ├── async_screen.py   # Асинхронная версия Screen
 │   ├── global_storage.py # Глобальное хранилище (Singleton)
 │   └── json_dict.py      # Обертка над JSON файлами
 │
-├── APM/                  # Менеджер пакетов
-│   ├── apm.py            # Главный CLI скрипт
+├── APM/                  # Менеджер пакетов (submodule)
 │   ├── modules/          # Команды APM
 │   │   ├── create.py     # Создание проектов
 │   │   ├── install.py    # Установка модулей
-│   │   ├── build.py      # Сборка в .exe
 │   │   └── ...
-│   ├── scripts/          # Установочные скрипты
-│   └── examples/         # Шаблоны проектов
+│   └── scripts/          # Установочные скрипты
 │
-├── tests/                # Тесты
-├── docs/                 # Документация (будет создана)
+├── sec/                  # Модуль безопасности (submodule)
+│   ├── intrusions.py     # IDS/IPS система
+│   ├── dlp.py            # Data Loss Prevention
+│   ├── cluster.py        # Кластеризация
+│   ├── dashboard.py      # Security Dashboard
+│   ├── auth.py           # Аутентификация
+│   └── AEngineApps/      # Интеграция с фреймворком
+│
+├── tests/                # Тесты (95 тестов)
+├── main.py               # Единая точка входа
+├── .dockerignore         # Docker ignore
 ├── docker-compose.yml    # Docker конфигурация
 ├── Dockerfile            # Docker образ
 ├── nginx.conf            # Nginx конфигурация
@@ -127,11 +133,11 @@ AEngine/
 
 #### 1. Клонирование репозитория
 
-AEngine использует Git submodules для AEngineApps и APM. Клонируйте с автоматической инициализацией submodules:
+AEngine использует Git submodules для AEngineApps, APM и sec. Клонируйте с автоматической инициализацией submodules:
 
 ```bash
 # Клонирование с submodules
-git clone --recursive https://github.com/yourusername/AEngine.git
+git clone --recursive https://github.com/aaalllexxx/AEngine.git
 cd AEngine
 ```
 
@@ -486,10 +492,10 @@ pip install pytest pytest-cov
 pytest
 
 # Запуск с покрытием
-pytest --cov=AEngineApps --cov=APM
+pytest --cov=AEngineApps --cov=APM --cov=sec
 
 # Запуск конкретного теста
-pytest tests/test_async_app.py
+pytest tests/test_app.py
 ```
 
 ### Структура тестов
@@ -497,12 +503,8 @@ pytest tests/test_async_app.py
 ```
 tests/
 ├── conftest.py              # Фикстуры pytest
-├── test_app.py              # Тесты App
-├── test_screen.py           # Тесты Screen
-├── test_api.py              # Тесты API
-├── test_service.py          # Тесты Service
-├── test_async_app.py        # Тесты AsyncApp
-└── test_apm.py              # Тесты APM
+└── test_app.py              # Тесты App, Screen, API, Service,
+                             # GlobalStorage, JsonDict, Security, main.py
 ```
 
 ---
@@ -533,25 +535,50 @@ tests/
 
 ## 📊 Статистика проекта
 
-- **Версия:** 2.2
+- **Версия:** 3.0.0
 - **Язык:** Python 3.8+
 - **Фреймворк:** Flask (обертка)
 - **Строк кода:** ~15,000+
 - **Модулей:** 50+
-- **Тестов:** 100+
+- **Тестов:** 95
+
+---
+
+## 🛡️ Security Demo
+
+Интерактивное демо-приложение для демонстрации возможностей модуля безопасности `sec`.
+
+> ⚠️ Демо-приложение доступно только локально и не включается в Git-репозиторий.
+
+### Запуск
+
+```bash
+# Локально
+python security-demo/app.py
+
+# Docker
+cd security-demo && docker-compose up --build
+```
+
+### Возможности
+- **Attack Simulator** — запуск 8 типов атак с живой реакцией IPS/IDS
+- **Architecture Viewer** — интерактивная схема модуля sec
+- **Metrics Dashboard** — мониторинг блокировок, системных метрик, нагрузочные тесты
+
+Подробнее: см. `security-demo/README.md`
 
 ---
 
 ## 🗺️ Roadmap
 
-### v2.3 (Q2 2026)
+### v3.2 (Q3 2026)
 - [ ] GraphQL поддержка
 - [ ] WebSocket интеграция
 - [ ] Встроенный ORM
 - [ ] CLI генератор CRUD
 - [ ] Плагин для VS Code
 
-### v3.0 (Q4 2026)
+### v4.0 (Q1 2027)
 - [ ] Полная переработка на FastAPI
 - [ ] Нативная async поддержка
 - [ ] Встроенный API Gateway
@@ -578,7 +605,7 @@ tests/
 ## 📞 Контакты
 
 - **Email:** support@aengine.dev
-- **GitHub:** https://github.com/yourusername/AEngine
+- **GitHub:** https://github.com/aaalllexxx/AEngine
 - **Документация:** https://aengine.dev/docs
 - **Telegram:** @aengine_community
 

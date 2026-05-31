@@ -145,7 +145,7 @@ git clone https://github.com/YOUR_USERNAME/AEngine.git
 cd AEngine
 
 # Добавьте upstream remote
-git remote add upstream https://github.com/ORIGINAL_OWNER/AEngine.git
+git remote add upstream https://github.com/aaalllexxx/AEngine.git
 ```
 
 ### 2. Создание ветки

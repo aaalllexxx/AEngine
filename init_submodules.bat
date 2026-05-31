@@ -17,6 +17,6 @@ echo ========================================
 echo   Готово!
 echo ========================================
 echo.
-echo AEngineApps и APM успешно загружены.
+echo AEngineApps, APM и sec успешно загружены.
 echo.
 pause

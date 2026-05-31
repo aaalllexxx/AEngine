@@ -456,7 +456,7 @@ class AsyncAPIScreen(AsyncScreen):
 #### Конструктор
 
 ```python
-from AEngineApps.intrusions import IDS
+from sec.intrusions import IDS
 
 ids = IDS(app: App)
 ```
@@ -479,7 +479,7 @@ add_detector(detector_class: Type[BaseDetector]) -> None
 
 **Пример:**
 ```python
-from AEngineApps.intrusions import SQLiDetector, XSSDetector
+from sec.intrusions import SQLiDetector, XSSDetector
 
 ids.add_detector(SQLiDetector)
 ids.add_detector(XSSDetector)
@@ -507,7 +507,7 @@ def alert_admin():
 Наследует IDS, но блокирует запросы при обнаружении атак.
 
 ```python
-from AEngineApps.intrusions import IPS
+from sec.intrusions import IPS
 
 ips = IPS(app)
 ips.add_detector(SQLiDetector)
@@ -524,7 +524,7 @@ ips.add_detector(SQLiDetector)
 #### Конструктор
 
 ```python
-from AEngineApps.intrusions import RateLimiter
+from sec.intrusions import RateLimiter
 
 limiter = RateLimiter(
     app: App,
@@ -553,7 +553,7 @@ limiter = RateLimiter(app, max_requests=100, window=60)
 Обнаруживает SQL инъекции.
 
 ```python
-from AEngineApps.intrusions import SQLiDetector
+from sec.intrusions import SQLiDetector
 
 ips.add_detector(SQLiDetector)
 ```
@@ -568,7 +568,7 @@ ips.add_detector(SQLiDetector)
 Обнаруживает XSS атаки.
 
 ```python
-from AEngineApps.intrusions import XSSDetector
+from sec.intrusions import XSSDetector
 
 ips.add_detector(XSSDetector)
 ```
@@ -583,7 +583,7 @@ ips.add_detector(XSSDetector)
 Обнаруживает попытки выполнения кода.
 
 ```python
-from AEngineApps.intrusions import RCEDetector
+from sec.intrusions import RCEDetector
 
 ips.add_detector(RCEDetector)
 ```
@@ -598,7 +598,7 @@ ips.add_detector(RCEDetector)
 Обнаруживает Local/Remote File Inclusion.
 
 ```python
-from AEngineApps.intrusions import LFIDetector
+from sec.intrusions import LFIDetector
 
 ips.add_detector(LFIDetector)
 ```
@@ -613,7 +613,7 @@ ips.add_detector(LFIDetector)
 ### Создание кастомного детектора
 
 ```python
-from AEngineApps.intrusions import BaseDetector, _get_all_input_values
+from sec.intrusions import BaseDetector, _get_all_input_values
 from flask import request
 
 class CustomDetector(BaseDetector):

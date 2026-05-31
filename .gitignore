@@ -98,3 +98,6 @@ node_modules/
 
 # Docker volumes
 .docker/
+
+# Security Demo (local only)
+security-demo/

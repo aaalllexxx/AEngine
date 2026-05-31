@@ -15,16 +15,17 @@ Git submodules позволяют включать один Git репозито
 
 Сначала создайте репозитории на GitHub для каждого компонента:
 
-1. **AEngineApps**: `https://github.com/yourusername/AEngineApps`
-2. **APM**: `https://github.com/yourusername/APM`
-3. **AEngine**: `https://github.com/yourusername/AEngine` (основной)
+1. **AEngineApps**: `https://github.com/aaalllexxx/AEngineApps`
+2. **APM**: `https://github.com/aaalllexxx/APM`
+3. **sec**: `https://github.com/aaalllexxx/sec`
+4. **AEngine**: `https://github.com/aaalllexxx/AEngine` (основной)
 
 ### Шаг 2: Подготовьте существующие папки
 
 Если у вас уже есть папки AEngineApps и APM с кодом:
 
 ```bash
-cd c:/Users/Администратор/Desktop/AEngine
+cd AEngine
 
 # Создайте резервные копии
 mkdir ../backup
@@ -46,7 +47,7 @@ git init
 git add .
 git commit -m "Initial commit: AEngineApps framework"
 git branch -M main
-git remote add origin https://github.com/yourusername/AEngineApps.git
+git remote add origin https://github.com/aaalllexxx/AEngineApps.git
 git push -u origin main
 ```
 
@@ -58,14 +59,14 @@ git init
 git add .
 git commit -m "Initial commit: APM package manager"
 git branch -M main
-git remote add origin https://github.com/yourusername/APM.git
+git remote add origin https://github.com/aaalllexxx/APM.git
 git push -u origin main
 ```
 
 ### Шаг 4: Добавьте submodules в основной репозиторий
 
 ```bash
-cd c:/Users/Администратор/Desktop/AEngine
+cd AEngine
 
 # Инициализируйте основной репозиторий (если еще не сделано)
 git init
@@ -73,15 +74,16 @@ git add .gitignore .gitmodules
 git commit -m "Add gitignore and gitmodules configuration"
 
 # Добавьте submodules
-git submodule add https://github.com/yourusername/AEngineApps.git AEngineApps
-git submodule add https://github.com/yourusername/APM.git APM
+git submodule add https://github.com/aaalllexxx/AEngineApps.git AEngineApps
+git submodule add https://github.com/aaalllexxx/APM.git APM
+git submodule add https://github.com/aaalllexxx/sec.git sec
 
 # Зафиксируйте изменения
 git add .
 git commit -m "Add AEngineApps and APM as submodules"
 
 # Отправьте в удаленный репозиторий
-git remote add origin https://github.com/yourusername/AEngine.git
+git remote add origin https://github.com/aaalllexxx/AEngine.git
 git push -u origin main
 ```
 
@@ -90,13 +92,13 @@ git push -u origin main
 ### Вариант 1: Клонирование с автоматической инициализацией
 
 ```bash
-git clone --recursive https://github.com/yourusername/AEngine.git
+git clone --recursive https://github.com/aaalllexxx/AEngine.git
 ```
 
 ### Вариант 2: Клонирование с ручной инициализацией
 
 ```bash
-git clone https://github.com/yourusername/AEngine.git
+git clone https://github.com/aaalllexxx/AEngine.git
 cd AEngine
 git submodule init
 git submodule update
@@ -105,7 +107,7 @@ git submodule update
 ### Вариант 3: Одна команда для обновления
 
 ```bash
-git clone https://github.com/yourusername/AEngine.git
+git clone https://github.com/aaalllexxx/AEngine.git
 cd AEngine
 git submodule update --init --recursive
 ```
@@ -199,7 +201,8 @@ AEngine/                          # Основной репозиторий
 │   └── .git                      # Ссылка на submodule
 ├── APM/                          # Submodule (отдельный репозиторий)
 │   └── .git                      # Ссылка на submodule
-├── sec/                          # Часть основного репозитория
+├── sec/                          # Submodule (отдельный репозиторий)
+│   └── .git                      # Ссылка на submodule
 ├── README.md
 ├── ARCHITECTURE.md
 └── ...
@@ -218,7 +221,7 @@ AEngine/                          # Основной репозиторий
 Когда коллега клонирует репозиторий:
 
 ```bash
-git clone https://github.com/yourusername/AEngine.git
+git clone https://github.com/aaalllexxx/AEngine.git
 cd AEngine
 git submodule update --init --recursive
 ```
@@ -232,7 +235,7 @@ git submodule update --recursive
 
 ### 3. Изменения в submodules
 
-Если вы изменили код в AEngineApps или APM:
+Если вы изменили код в AEngineApps, APM или sec:
 
 1. Зафиксируйте изменения в submodule
 2. Push в репозиторий submodule
@@ -246,13 +249,13 @@ git submodule update --recursive
 
 ```bash
 # Добавить subtree
-git subtree add --prefix AEngineApps https://github.com/yourusername/AEngineApps.git main --squash
+git subtree add --prefix AEngineApps https://github.com/aaalllexxx/AEngineApps.git main --squash
 
 # Обновить subtree
-git subtree pull --prefix AEngineApps https://github.com/yourusername/AEngineApps.git main --squash
+git subtree pull --prefix AEngineApps https://github.com/aaalllexxx/AEngineApps.git main --squash
 
 # Отправить изменения обратно
-git subtree push --prefix AEngineApps https://github.com/yourusername/AEngineApps.git main
+git subtree push --prefix AEngineApps https://github.com/aaalllexxx/AEngineApps.git main
 ```
 
 **Преимущества subtree:**
@@ -279,7 +282,7 @@ git subtree push --prefix AEngineApps https://github.com/yourusername/AEngineApp
 ```bash
 git submodule deinit -f AEngineApps
 git rm -f AEngineApps
-git submodule add https://github.com/yourusername/AEngineApps.git AEngineApps
+git submodule add https://github.com/aaalllexxx/AEngineApps.git AEngineApps
 ```
 
 ### Проблема: Конфликты при обновлении

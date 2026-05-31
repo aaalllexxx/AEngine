@@ -1,4 +1,3 @@
-фреймворк
 # 🚀 AEngine Production Enterprise Guide
 
 Руководство по использованию AEngine в production enterprise окружении.
@@ -390,7 +389,7 @@ CMD ["python", "main.py"]
 
 ## 📞 Поддержка
 
-- GitHub Issues: https://github.com/yourusername/AEngine/issues
+- GitHub Issues: https://github.com/aaalllexxx/AEngine/issues
 - Документация: https://aengine.readthedocs.io
 - Telegram: @aengine_support
 
