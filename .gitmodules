@@ -1,7 +1,7 @@
 [submodule "AEngineApps"]
 	path = AEngineApps
 	url = https://github.com/aaalllexxx/AEngineApps.git
-	branch = main
+	branch = master
 
 [submodule "APM"]
 	path = APM

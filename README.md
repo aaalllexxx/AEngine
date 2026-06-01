@@ -2,7 +2,7 @@
 
 <div align="center">
 
-![Version](https://img.shields.io/badge/version-3.0.0-blue.svg)
+![Version](https://img.shields.io/badge/version-3.2.0-blue.svg)
 ![Python](https://img.shields.io/badge/python-3.8+-green.svg)
 ![License](https://img.shields.io/badge/license-MIT-orange.svg)
 
@@ -108,7 +108,7 @@ AEngine/
 │   ├── auth.py           # Аутентификация
 │   └── AEngineApps/      # Интеграция с фреймворком
 │
-├── tests/                # Тесты (95 тестов)
+├── tests/                # Тесты (101 тест)
 ├── main.py               # Единая точка входа
 ├── .dockerignore         # Docker ignore
 ├── docker-compose.yml    # Docker конфигурация
@@ -305,7 +305,7 @@ class HomeScreen(Screen):
 - [Архитектура проекта](ARCHITECTURE.md) — детальное описание архитектуры
 - [API Reference](API_REFERENCE.md) — справочник по всем классам и методам
 - [Руководство разработчика](DEVELOPER_GUIDE.md) — как участвовать в разработке
-- [Примеры](examples/) — готовые примеры приложений
+- [Security Demo](security-demo/README.md) — интерактивный демо-стенд модуля безопасности
 
 ---
 
@@ -415,7 +415,7 @@ app.load_config("config.json")
 app.run()
 ```
 
-📁 [Больше примеров в папке examples/](examples/)
+📁 [Интерактивный демо-стенд модуля безопасности](security-demo/README.md)
 
 ---
 
@@ -437,26 +437,31 @@ AEngine поддерживает установку дополнительных
 # Сборка образа
 docker build -t aengine-app .
 
-# Запуск контейнера
-docker run -p 5000:5000 aengine-app
+# Запуск контейнера (порт 8000)
+docker run -p 8000:8000 aengine-app
 ```
 
 ### Docker Compose
 
 ```bash
-# Запуск с Nginx и PostgreSQL
+# Запуск с Nginx, Redis и PostgreSQL
 docker-compose up -d
 ```
 
-### Nginx + Gunicorn
+### Hypercorn (production)
+
+`main.py` экспортирует ASGI-приложение `asgi_app` (WSGI→ASGI адаптер) — именно
+оно запускается в Docker:
 
 ```bash
 # Установка зависимостей
-pip install gunicorn
+pip install hypercorn asgiref
 
-# Запуск с Gunicorn
-gunicorn -w 4 -b 0.0.0.0:5000 main:app.flask_app
+# Запуск
+hypercorn main:asgi_app --bind 0.0.0.0:8000 --workers 4
 ```
+
+> Альтернатива (WSGI): `gunicorn -w 4 -b 0.0.0.0:8000 "main:app.flask"` на Linux.
 
 ### Systemd Service (Linux)
 
@@ -503,8 +508,10 @@ pytest tests/test_app.py
 ```
 tests/
 ├── conftest.py              # Фикстуры pytest
-└── test_app.py              # Тесты App, Screen, API, Service,
-                             # GlobalStorage, JsonDict, Security, main.py
+├── test_app.py              # App, Screen, API, Service, GlobalStorage, JsonDict
+├── test_async_app.py        # Асинхронные приложения
+├── test_main.py             # Точка входа main.py
+└── test_security.py         # Модуль sec: DLP, детекторы IDS/IPS, ClusterNode
 ```
 
 ---
@@ -535,25 +542,25 @@ tests/
 
 ## 📊 Статистика проекта
 
-- **Версия:** 3.0.0
+- **Версия:** 3.2.0
 - **Язык:** Python 3.8+
 - **Фреймворк:** Flask (обертка)
 - **Строк кода:** ~15,000+
 - **Модулей:** 50+
-- **Тестов:** 95
+- **Тестов:** 101
 
 ---
 
 ## 🛡️ Security Demo
 
-Интерактивное демо-приложение для демонстрации возможностей модуля безопасности `sec`.
-
-> ⚠️ Демо-приложение доступно только локально и не включается в Git-репозиторий.
+Интерактивный демо-стенд ([security-demo/](security-demo/)) для демонстрации
+возможностей модуля безопасности `sec`. **Прогоняет атаки через настоящий код
+`sec`** — детекторы IPS/IDS, `RateLimiter` и DLP-middleware, а не имитацию.
 
 ### Запуск
 
 ```bash
-# Локально
+# Локально (откроется на http://127.0.0.1:5050)
 python security-demo/app.py
 
 # Docker
@@ -561,17 +568,17 @@ cd security-demo && docker-compose up --build
 ```
 
 ### Возможности
-- **Attack Simulator** — запуск 8 типов атак с живой реакцией IPS/IDS
-- **Architecture Viewer** — интерактивная схема модуля sec
+- **Attack Simulator** — запуск 8 типов атак (SQLi, XSS, LFI, RCE, DDoS, CVE, DLP, APT chain) с живой реакцией IPS/IDS
+- **Architecture Viewer** — интерактивная SVG-схема модуля sec
 - **Metrics Dashboard** — мониторинг блокировок, системных метрик, нагрузочные тесты
 
-Подробнее: см. `security-demo/README.md`
+Подробнее: см. [security-demo/README.md](security-demo/README.md)
 
 ---
 
 ## 🗺️ Roadmap
 
-### v3.2 (Q3 2026)
+### v3.3 (Q4 2026)
 - [ ] GraphQL поддержка
 - [ ] WebSocket интеграция
 - [ ] Встроенный ORM

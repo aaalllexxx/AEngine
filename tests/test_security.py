@@ -136,6 +136,57 @@ class TestDetectorPatterns:
 
 
 # ═══════════════════════════════════════════════════════════════
+# IPS детекторы — поведение на реальном запросе (request context)
+# ═══════════════════════════════════════════════════════════════
+
+
+class TestDetectorRuntime:
+    """Прогон детекторов в контексте Flask-запроса (как в реальном IPS)."""
+
+    @staticmethod
+    def _detect(detector_cls, payload):
+        """Возвращает True, если детектор сработал на payload."""
+        from urllib.parse import quote
+        from flask import Flask
+
+        app = Flask(__name__)
+        triggered = {"v": False}
+        with app.test_request_context("/probe?q=" + quote(payload)):
+            det = detector_cls(app)
+            det.trigger_response = lambda: triggered.__setitem__("v", True)
+            det.run()
+        return triggered["v"]
+
+    def test_rce_command_substitution(self):
+        """RCEDetector ловит подстановку команд $() и обратные кавычки."""
+        assert self._detect(RCEDetector, "$(whoami)") is True
+        assert self._detect(RCEDetector, "`id`") is True
+
+    def test_rce_dangerous_commands(self):
+        """RCEDetector ловит опасные команды даже с shell-метасимволами."""
+        assert self._detect(RCEDetector, "; cat /etc/passwd") is True
+        assert self._detect(RCEDetector, "| ls -la") is True
+        assert self._detect(RCEDetector, "& ping 127.0.0.1") is True
+
+    def test_rce_clean_input_passes(self):
+        """RCEDetector не срабатывает на безобидный ввод."""
+        assert self._detect(RCEDetector, "hello world") is False
+        assert self._detect(RCEDetector, "username123") is False
+
+    def test_sqli_runtime(self):
+        """SQLiDetector ловит классическую инъекцию."""
+        assert self._detect(SQLiDetector, "' OR 1=1 --") is True
+
+    def test_xss_runtime(self):
+        """XSSDetector ловит инъекцию скрипта."""
+        assert self._detect(XSSDetector, "<script>alert(1)</script>") is True
+
+    def test_lfi_runtime(self):
+        """LFIDetector ловит path traversal."""
+        assert self._detect(LFIDetector, "../../etc/passwd") is True
+
+
+# ═══════════════════════════════════════════════════════════════
 # ClusterNode
 # ═══════════════════════════════════════════════════════════════
 

@@ -5,6 +5,38 @@ All notable changes to AEngine project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.2.0] - 2026-06-01
+
+### Changed
+- 🛡️ **Security Demo теперь использует НАСТОЯЩИЙ модуль `sec`.** Бэкенд стенда
+  (`security-demo/app.py`) полностью переписан: вместо повторной реализации логики
+  защиты полезные нагрузки прогоняются через реальные компоненты `sec`.
+  - `/api/attack/run` — реальные детекторы IPS/IDS (`SQLiDetector`, `XSSDetector`,
+    `LFIDetector`, `RCEDetector`, `SignatureDetector`) в контексте Flask-запроса;
+  - `/api/attack/flood` — реальный `RateLimiter` со скользящим окном (модельное время);
+  - `/api/attack/dlp-test` — реальный DLP-middleware (`after_request`) на отдельном приложении;
+  - `/api/attack/chain` — APT-цепочка на реальных детекторах и DLP-фильтрах.
+- Детектор `RCEDetector` (submodule `sec`) усилен: детерминированное обнаружение
+  подстановки команд (`$(...)`, обратные кавычки) и инъекции команд независимо от
+  окружения. Подробности — в `sec/changelog.md` (2.7.0).
+
+### Added
+- Эндпоинт `/health` в демо-стенде для Docker/балансировщиков.
+- Конфигурация демо-стенда через переменные окружения `HOST` / `PORT` / `DEBUG` / `SECRET_KEY`.
+- Регрессионные тесты детекторов в контексте запроса (`tests/test_security.py`) —
+  всего тестов: **101** (было 95).
+
+### Fixed
+- Удалена лишняя зависимость `pywebview` из `security-demo/requirements.txt`
+  (ломала сборку Docker-образа на Alpine; стенд работает в web-режиме).
+- Healthcheck демо-стенда переключён на `/health` (Dockerfile, docker-compose).
+- Документация приведена в соответствие с кодом:
+  - `security-demo/README.md` — исправлены тело запросов API (`attack_type`),
+    список полей метрик, переменные окружения;
+  - корневой `README.md` — корректная команда запуска (`hypercorn main:asgi_app`,
+    порт 8000), удалены ссылки на несуществующую папку `examples/`, обновлены
+    версия (3.2.0) и число тестов (101).
+
 ## [2.2.0] - 2026-06-01
 
 ### Added
