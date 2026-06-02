@@ -15,14 +15,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   падает с `ModuleNotFoundError: No module named 'webview'`, если pywebview не
   установлен. На свежей машине `pip install -r requirements.txt && python app.py`
   не запускался — теперь запускается.
+- 🐞 **Добавлена зависимость `rich` в `security-demo/requirements.txt`.** Стенд
+  импортирует `sec.intrusions`/`sec.dlp`, а `sec/__init__.py` загружает весь пакет,
+  включая `sec/logging.py` (`from rich import print`). Без `rich` контейнер падал с
+  `ModuleNotFoundError: No module named 'rich'`. Полнота списка зависимостей
+  проверена в чистом venv (только `requirements.txt`) — стенд импортируется и
+  отвечает на всех эндпоинтах.
 
 ### Added
 - 🔄 **Авто-установка зависимостей** в `security-demo/app.py`: при прямом запуске
   стенд сам доустанавливает недостающие пакеты из `requirements.txt`
-  (`flask`, `psutil`, `pywebview`). Отключается `AENGINE_NO_AUTO_INSTALL=1`.
+  (`flask`, `psutil`, `pywebview`, `rich`). Отключается `AENGINE_NO_AUTO_INSTALL=1`.
 - 🧪 Регрессионные тесты зависимостей стенда (`tests/test_demo_deps.py`): проверяют,
-  что `flask`/`psutil`/`pywebview` объявлены в `requirements.txt` и что `AEngineApps`
-  импортирует `webview` на уровне модуля. Всего тестов: **105** (было 101).
+  что `flask`/`psutil`/`pywebview`/`rich` объявлены в `requirements.txt` и что
+  `AEngineApps` тянет `webview`, а `sec` — `rich` при импорте. Всего тестов: **107**
+  (было 101).
 
 ### Changed
 - 🐳 Базовый образ демо-стенда переведён с `python:3.11-alpine` на

@@ -3,3 +3,6 @@ psutil>=5.9.0
 # AEngineApps импортирует webview на уровне модуля (AEngineApps/app.py),
 # поэтому pywebview обязателен даже в web-режиме стенда.
 pywebview>=4.0
+# Модуль sec при импорте тянет rich (sec/logging.py: `from rich import print`),
+# а sec/__init__.py загружает весь пакет — поэтому rich нужен стенду.
+rich>=13.0

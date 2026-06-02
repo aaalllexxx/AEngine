@@ -31,7 +31,7 @@ def _declared_distributions() -> set[str]:
     return names
 
 
-@pytest.mark.parametrize("distribution", ["flask", "psutil", "pywebview"])
+@pytest.mark.parametrize("distribution", ["flask", "psutil", "pywebview", "rich"])
 def test_demo_requirements_declares(distribution):
     """Все рантайм-зависимости стенда объявлены в requirements.txt."""
     assert distribution in _declared_distributions(), (
@@ -52,4 +52,19 @@ def test_aengineapps_requires_webview():
     assert "webview" in sys.modules, (
         "AEngineApps больше не импортирует webview на уровне модуля — "
         "пересмотрите необходимость pywebview в requirements и документации."
+    )
+
+
+def test_sec_requires_rich():
+    """Импорт пакета sec тянет rich → rich обязателен в requirements стенда.
+
+    ``sec/__init__.py`` загружает весь пакет, а ``sec/logging.py`` делает
+    ``from rich import print``. Стенд импортирует ``sec.intrusions`` / ``sec.dlp``,
+    поэтому без rich контейнер падает с ModuleNotFoundError (баг 3.2.1 в Docker).
+    """
+    import sec.intrusions  # noqa: F401  (импорт ради побочного эффекта)
+
+    assert "rich" in sys.modules, (
+        "sec больше не импортирует rich при загрузке — "
+        "пересмотрите необходимость rich в requirements стенда."
     )

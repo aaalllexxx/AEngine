@@ -30,7 +30,12 @@ def _ensure_dependencies() -> None:
     import importlib.util
 
     # модуль для импорта → имя дистрибутива на PyPI
-    required = {"flask": "flask", "psutil": "psutil", "webview": "pywebview"}
+    required = {
+        "flask": "flask",
+        "psutil": "psutil",
+        "webview": "pywebview",  # AEngineApps импортирует webview на уровне модуля
+        "rich": "rich",          # sec тянет rich при импорте (sec/logging.py)
+    }
     missing = [pkg for mod, pkg in required.items() if importlib.util.find_spec(mod) is None]
     if not missing:
         return
