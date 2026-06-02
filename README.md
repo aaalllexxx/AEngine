@@ -2,7 +2,7 @@
 
 <div align="center">
 
-![Version](https://img.shields.io/badge/version-3.2.1-blue.svg)
+![Version](https://img.shields.io/badge/version-3.3.0-blue.svg)
 ![Python](https://img.shields.io/badge/python-3.8%20--%203.14-green.svg)
 ![License](https://img.shields.io/badge/license-MIT-orange.svg)
 
@@ -108,7 +108,7 @@ AEngine/
 │   ├── auth.py           # Аутентификация
 │   └── AEngineApps/      # Интеграция с фреймворком
 │
-├── tests/                # Тесты (107 тестов)
+├── tests/                # Тесты (115 тестов)
 ├── main.py               # Единая точка входа
 ├── .dockerignore         # Docker ignore
 ├── docker-compose.yml    # Docker конфигурация
@@ -542,12 +542,12 @@ tests/
 
 ## 📊 Статистика проекта
 
-- **Версия:** 3.2.1
+- **Версия:** 3.3.0
 - **Язык:** Python 3.8+
 - **Фреймворк:** Flask (обертка)
 - **Строк кода:** ~15,000+
 - **Модулей:** 50+
-- **Тестов:** 107
+- **Тестов:** 115
 
 ---
 

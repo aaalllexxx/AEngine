@@ -58,35 +58,37 @@
 
 ## 🏗️ Архитектура
 
+Стенд построен по структуре **AEngineApps** (`App` + `config.json` + экраны
+`Screen`/`API` + `GlobalStorage`) и использует модуль `sec` строго по его
+документации: компоненты привязываются к приложению (`IPS(app)`, `DLP(app)`,
+`RateLimiter(app)`), после чего payload'ы прогоняются **настоящими HTTP-запросами**
+через защищённые приложения (`flask.test_client()`). Middleware `sec`
+(`before_request` / `after_request`) отрабатывает как в проде — стенд лишь читает
+результат (код ответа, замаскированное тело, лог детектора).
+
 ```
 ┌──────────────────────────────────────────────────────────┐
-│                    Browser (SPA)                         │
-│  ┌─────────────┬─────────────────┬────────────────────┐  │
-│  │   Attacks    │  Architecture   │     Metrics        │  │
-│  │  (attacks.js)│(architecture.js)│   (metrics.js)     │  │
-│  └──────┬───────┴────────┬────────┴─────────┬─────────┘  │
-│         └────────────────┼──────────────────┘            │
-│                          │ fetch API                     │
-└──────────────────────────┼───────────────────────────────┘
-                           │
+│                    Browser (SPA)                          │
+│   Attacks (attacks.js) · Architecture · Metrics           │
+└──────────────────────────┬───────────────────────────────┘
+                           │ fetch /api/*
 ┌──────────────────────────┼───────────────────────────────┐
-│                     Flask / AEngineApps                   │
-│  ┌───────────────────────┼────────────────────────────┐  │
-│  │              API Endpoints (app.py)                │  │
-│  │  /api/attacks/catalog  /api/attack/run             │  │
-│  │  /api/attack/flood     /api/attack/dlp-test        │  │
-│  │  /api/attack/chain     /api/metrics/*              │  │
-│  └───────────────────────┬────────────────────────────┘  │
-│                          │                               │
-│  ┌───────────────────────┼────────────────────────────┐  │
-│  │          sec module (РЕАЛЬНЫЙ код)                  │  │
-│  │  Detectors → RateLimiter → DLP  (через request ctx)│  │
-│  └────────────────────────────────────────────────────┘  │
-│                                                          │
-│  ┌────────────────────────────────────────────────────┐  │
-│  │       GlobalStorage (metrics, logs, state)         │  │
-│  └────────────────────────────────────────────────────┘  │
-└──────────────────────────────────────────────────────────┘
+│            Демо-приложение (AEngineApps.App)              │
+│   main.py + config.json + screens/ (Screen / API)         │
+│   /api/attacks/catalog  /api/attack/run  /api/attack/...  │
+│   /api/metrics/*        /health          GlobalStorage    │
+└───────────────┬───────────────────────────┬──────────────┘
+                │ реальные запросы (test_client)
+   ┌────────────┴───────────┐      ┌──────────┴──────────────┐
+   │  application IPS (App)  │      │   signature WAF (App)   │
+   │  IPS: SQLi/XSS/LFI/RCE  │      │   IPS: SignatureDetector│
+   │  DLP: Mail/Phone/Passp. │      │   (OWASP CRS, 109 сигн.)│
+   │  before/after_request   │      │   before_request        │
+   └─────────────────────────┘      └─────────────────────────┘
+   ┌─────────────────────────────────────────────────────────┐
+   │  RateLimiter lab (App, свежий на каждый flood-прогон)     │
+   └─────────────────────────────────────────────────────────┘
+              ▲  всё это — настоящие компоненты модуля sec
 ```
 
 ---
@@ -112,11 +114,11 @@ cd security-demo
 # Установка зависимостей
 pip install -r requirements.txt
 
-# Запуск
-python app.py
+# Запуск (точка входа AEngine)
+python main.py
 ```
 
-> 🔄 **Авто-установка.** При прямом запуске (`python app.py`) стенд сам доустановит
+> 🔄 **Авто-установка.** При прямом запуске (`python main.py`) стенд сам доустановит
 > недостающие зависимости из `requirements.txt` — свежий клон поднимается «из коробки».
 > Отключить можно переменной `AENGINE_NO_AUTO_INSTALL=1` (в Docker она выставлена,
 > т.к. зависимости уже установлены на этапе сборки образа).
@@ -210,7 +212,14 @@ curl -X POST http://localhost:5050/api/metrics/stress-test \
 
 ```
 security-demo/
-├── app.py                      # Бэкенд: API-эндпоинты, инициализация sec
+├── main.py                     # Точка входа AEngine: App + load_config + run
+├── config.json                 # Конфигурация AEngineApps (host/port/view/папки)
+├── sandbox.py                  # Защищённые sec-приложения (IPS/DLP/WAF) + RateLimiter lab
+├── state.py                    # Метрики и журнал поверх GlobalStorage
+├── screens/                    # Экраны Screen / API
+│   ├── pages.py                #   IndexPage (SPA) + HealthScreen (/health)
+│   ├── attacks.py              #   /api/attacks/catalog, /api/attack/*
+│   └── metrics.py              #   /api/metrics/*
 ├── requirements.txt            # Python-зависимости
 ├── Dockerfile                  # Docker-образ
 ├── docker-compose.yml          # Оркестрация с монтированием модулей
@@ -226,6 +235,10 @@ security-demo/
         ├── architecture.js     # Вкладка «Architecture» (SVG-схема)
         └── metrics.js          # Вкладка «Metrics Dashboard» (Canvas-графики)
 ```
+
+> Логика защиты в стенде **не дублируется**: `sandbox.py` лишь привязывает
+> компоненты `sec` к приложениям и шлёт по ним реальные запросы; экраны в `screens/`
+> транслируют действия UI в эти запросы и возвращают наблюдаемый результат.
 
 ---
 

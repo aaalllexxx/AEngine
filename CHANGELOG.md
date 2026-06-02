@@ -5,6 +5,34 @@ All notable changes to AEngine project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.3.0] - 2026-06-03
+
+### Changed
+- 🏗️ **Архитектура security-demo переписана по структуре AEngineApps и
+  использует модуль `sec` строго по документации.** Прежний бэкенд имитировал
+  работу `sec` хаками (ручное создание детекторов, `unittest.mock.patch` для
+  подмены времени `RateLimiter`, прогон в искусственном request-контексте).
+  Теперь:
+  - стенд разложен по структуре фреймворка: `main.py` (`App` + `load_config`),
+    `config.json`, экраны `Screen`/`API` в `screens/`, состояние — в `GlobalStorage`
+    (`state.py`); единый монолит `app.py` удалён;
+  - компоненты `sec` привязываются к приложению штатно (`IPS(app)` + детекторы,
+    `DLP(app, mode=Agressive)`, `RateLimiter(app, ...)`), как в разделе
+    «Полный пример интеграции» из `sec/README.md`;
+  - payload'ы прогоняются **настоящими HTTP-запросами** через защищённые
+    приложения (`flask.test_client()`): IPS блокирует на `before_request`
+    (`abort 400`), DLP маскирует на `after_request`, RateLimiter отдаёт `429` —
+    стенд лишь читает реальный результат, логику защиты не дублирует;
+  - реалистичная двухслойная защита: прикладной IPS (SQLi/XSS/LFI/RCE) + DLP и
+    отдельный сигнатурный WAF-слой (OWASP CRS, `SignatureDetector`) для CVE;
+    демонстрация RateLimiter вынесена в изолированную «лабораторию».
+- 🐳 Точка входа Docker-образа стенда переключена на `python main.py`.
+
+### Added
+- 🧪 Интеграционные тесты стенда (`tests/test_demo_app.py`): блокировка SQLi/CVE
+  реальными IPS/WAF, маскирование ПДн через DLP, срабатывание RateLimiter на
+  потоке, полная APT-цепочка. Всего тестов: **115** (было 107).
+
 ## [3.2.1] - 2026-06-03
 
 ### Fixed
