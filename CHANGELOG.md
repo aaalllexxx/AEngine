@@ -5,6 +5,69 @@ All notable changes to AEngine project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.3.0] - 2026-06-03
+
+### Changed
+- 🏗️ **Архитектура security-demo переписана по структуре AEngineApps и
+  использует модуль `sec` строго по документации.** Прежний бэкенд имитировал
+  работу `sec` хаками (ручное создание детекторов, `unittest.mock.patch` для
+  подмены времени `RateLimiter`, прогон в искусственном request-контексте).
+  Теперь:
+  - стенд разложен по структуре фреймворка: `main.py` (`App` + `load_config`),
+    `config.json`, экраны `Screen`/`API` в `screens/`, состояние — в `GlobalStorage`
+    (`state.py`); единый монолит `app.py` удалён;
+  - компоненты `sec` привязываются к приложению штатно (`IPS(app)` + детекторы,
+    `DLP(app, mode=Agressive)`, `RateLimiter(app, ...)`), как в разделе
+    «Полный пример интеграции» из `sec/README.md`;
+  - payload'ы прогоняются **настоящими HTTP-запросами** через защищённые
+    приложения (`flask.test_client()`): IPS блокирует на `before_request`
+    (`abort 400`), DLP маскирует на `after_request`, RateLimiter отдаёт `429` —
+    стенд лишь читает реальный результат, логику защиты не дублирует;
+  - реалистичная двухслойная защита: прикладной IPS (SQLi/XSS/LFI/RCE) + DLP и
+    отдельный сигнатурный WAF-слой (OWASP CRS, `SignatureDetector`) для CVE;
+    демонстрация RateLimiter вынесена в изолированную «лабораторию».
+- 🐳 Точка входа Docker-образа стенда переключена на `python main.py`.
+
+### Added
+- 🧪 Интеграционные тесты стенда (`tests/test_demo_app.py`): блокировка SQLi/CVE
+  реальными IPS/WAF, маскирование ПДн через DLP, срабатывание RateLimiter на
+  потоке, полная APT-цепочка. Всего тестов: **115** (было 107).
+
+## [3.2.1] - 2026-06-03
+
+### Fixed
+- 🐞 **Восстановлена зависимость `pywebview` в `security-demo/requirements.txt`.**
+  В 3.2.0 она была ошибочно удалена с формулировкой «стенд работает в web-режиме».
+  Однако `AEngineApps` импортирует `webview` на уровне модуля
+  (`AEngineApps/app.py`), поэтому даже в web-режиме `from AEngineApps import App`
+  падает с `ModuleNotFoundError: No module named 'webview'`, если pywebview не
+  установлен. На свежей машине `pip install -r requirements.txt && python app.py`
+  не запускался — теперь запускается.
+- 🐞 **Добавлена зависимость `rich` в `security-demo/requirements.txt`.** Стенд
+  импортирует `sec.intrusions`/`sec.dlp`, а `sec/__init__.py` загружает весь пакет,
+  включая `sec/logging.py` (`from rich import print`). Без `rich` контейнер падал с
+  `ModuleNotFoundError: No module named 'rich'`. Полнота списка зависимостей
+  проверена в чистом venv (только `requirements.txt`) — стенд импортируется и
+  отвечает на всех эндпоинтах.
+
+### Added
+- 🔄 **Авто-установка зависимостей** в `security-demo/app.py`: при прямом запуске
+  стенд сам доустанавливает недостающие пакеты из `requirements.txt`
+  (`flask`, `psutil`, `pywebview`, `rich`). Отключается `AENGINE_NO_AUTO_INSTALL=1`.
+- 🧪 Регрессионные тесты зависимостей стенда (`tests/test_demo_deps.py`): проверяют,
+  что `flask`/`psutil`/`pywebview`/`rich` объявлены в `requirements.txt` и что
+  `AEngineApps` тянет `webview`, а `sec` — `rich` при импорте. Всего тестов: **107**
+  (было 101).
+
+### Changed
+- 🐳 Базовый образ демо-стенда переведён с `python:3.11-alpine` на
+  `python:3.11-slim`: `psutil` и `pywebview` ставятся из готовых wheel'ов без
+  сборочных инструментов (ранее именно компиляция на Alpine и была источником
+  проблем). В Docker выставлена `AENGINE_NO_AUTO_INSTALL=1` — зависимости
+  устанавливаются на этапе сборки образа.
+- 📝 `security-demo/README.md`: добавлены разделы о зависимостях и авто-установке,
+  исправлено описание healthcheck (`/health`).
+
 ## [3.2.0] - 2026-06-01
 
 ### Changed

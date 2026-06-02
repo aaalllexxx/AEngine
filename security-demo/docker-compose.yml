@@ -1,0 +1,26 @@
+version: "3.9"
+
+services:
+  security-demo:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: aengine-security-demo
+    ports:
+      - "5050:5050"
+    volumes:
+      # Монтируем модули AEngine из родительского каталога
+      - ../AEngineApps:/app/AEngineApps:ro
+      - ../sec:/app/sec:ro
+    environment:
+      - PYTHONUNBUFFERED=1
+      - FLASK_ENV=production
+      # Зависимости установлены в образе на этапе сборки.
+      - AENGINE_NO_AUTO_INSTALL=1
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:5050/health')"]
+      interval: 30s
+      timeout: 5s
+      start_period: 10s
+      retries: 3
