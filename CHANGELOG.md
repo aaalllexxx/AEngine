@@ -5,6 +5,34 @@ All notable changes to AEngine project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.2.1] - 2026-06-03
+
+### Fixed
+- 🐞 **Восстановлена зависимость `pywebview` в `security-demo/requirements.txt`.**
+  В 3.2.0 она была ошибочно удалена с формулировкой «стенд работает в web-режиме».
+  Однако `AEngineApps` импортирует `webview` на уровне модуля
+  (`AEngineApps/app.py`), поэтому даже в web-режиме `from AEngineApps import App`
+  падает с `ModuleNotFoundError: No module named 'webview'`, если pywebview не
+  установлен. На свежей машине `pip install -r requirements.txt && python app.py`
+  не запускался — теперь запускается.
+
+### Added
+- 🔄 **Авто-установка зависимостей** в `security-demo/app.py`: при прямом запуске
+  стенд сам доустанавливает недостающие пакеты из `requirements.txt`
+  (`flask`, `psutil`, `pywebview`). Отключается `AENGINE_NO_AUTO_INSTALL=1`.
+- 🧪 Регрессионные тесты зависимостей стенда (`tests/test_demo_deps.py`): проверяют,
+  что `flask`/`psutil`/`pywebview` объявлены в `requirements.txt` и что `AEngineApps`
+  импортирует `webview` на уровне модуля. Всего тестов: **105** (было 101).
+
+### Changed
+- 🐳 Базовый образ демо-стенда переведён с `python:3.11-alpine` на
+  `python:3.11-slim`: `psutil` и `pywebview` ставятся из готовых wheel'ов без
+  сборочных инструментов (ранее именно компиляция на Alpine и была источником
+  проблем). В Docker выставлена `AENGINE_NO_AUTO_INSTALL=1` — зависимости
+  устанавливаются на этапе сборки образа.
+- 📝 `security-demo/README.md`: добавлены разделы о зависимостях и авто-установке,
+  исправлено описание healthcheck (`/health`).
+
 ## [3.2.0] - 2026-06-01
 
 ### Changed

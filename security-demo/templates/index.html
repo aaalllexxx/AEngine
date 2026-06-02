@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AEngine Security Demo</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+    <!-- Header -->
+    <header class="header">
+        <div class="header-logo">
+            <span class="logo-icon">🛡️</span>
+            <h1>AEngine <span class="accent">Security</span> Demo</h1>
+        </div>
+        <nav class="header-nav">
+            <button class="nav-btn active" data-tab="attacks">
+                <span class="nav-icon">⚔️</span>
+                <span class="nav-text">Симулятор атак</span>
+            </button>
+            <button class="nav-btn" data-tab="architecture">
+                <span class="nav-icon">🏗️</span>
+                <span class="nav-text">Архитектура</span>
+            </button>
+            <button class="nav-btn" data-tab="metrics">
+                <span class="nav-icon">📊</span>
+                <span class="nav-text">Метрики</span>
+            </button>
+        </nav>
+        <div class="header-status">
+            <span class="status-dot"></span>
+            <span id="status-text">Система активна</span>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="main-content">
+        <!-- Tab 1: Attacks -->
+        <section id="tab-attacks" class="tab-content active">
+            <div class="tab-header">
+                <h2>⚔️ Симулятор атак</h2>
+                <p class="tab-desc">Запускайте симулированные атаки и наблюдайте за реакцией системы защиты AEngine</p>
+            </div>
+            <div id="attacks-container" class="attacks-grid">
+                <!-- Карточки атак генерируются в attacks.js -->
+            </div>
+        </section>
+
+        <!-- Tab 2: Architecture -->
+        <section id="tab-architecture" class="tab-content">
+            <div class="tab-header">
+                <h2>🏗️ Архитектура модуля sec</h2>
+                <p class="tab-desc">Интерактивная схема компонентов системы безопасности AEngine</p>
+            </div>
+            <div id="architecture-container">
+                <!-- SVG-схема генерируется в architecture.js -->
+            </div>
+        </section>
+
+        <!-- Tab 3: Metrics -->
+        <section id="tab-metrics" class="tab-content">
+            <div class="tab-header">
+                <h2>📊 Метрики и мониторинг</h2>
+                <p class="tab-desc">Мониторинг в реальном времени: атаки, система, логи событий</p>
+            </div>
+            <div id="metrics-container">
+                <!-- Панели метрик генерируются в metrics.js -->
+            </div>
+        </section>
+    </main>
+
+    <!-- Popup overlay -->
+    <div id="popup-overlay" class="popup-overlay hidden">
+        <div id="popup-content" class="popup-content">
+            <button class="popup-close" onclick="closePopup()">&times;</button>
+            <div id="popup-body"></div>
+        </div>
+    </div>
+
+    <!-- Toast notifications -->
+    <div id="toast-container" class="toast-container"></div>
+
+    <script src="/static/js/app.js"></script>
+    <script src="/static/js/attacks.js"></script>
+    <script src="/static/js/architecture.js"></script>
+    <script src="/static/js/metrics.js"></script>
+</body>
+</html>
