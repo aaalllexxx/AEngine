@@ -100,30 +100,31 @@ def unlock_file(filepath):
         print(f"[yellow]![/yellow] Не удалось разблокировать {os.path.basename(filepath)}: {e}")
 
 def verify_admin(project_root):
-    """Проверяет пароль администратора безопасности (интерактивно)."""
-    password = getpass.getpass("Введите пароль администратора: ")
-    return verify_password(project_root, password)
-
-def verify_password(project_root, password):
-    """Проверяет пароль администратора безопасности (неинтерактивно)."""
+    """Проверяет пароль администратора безопасности."""
     admin_file = get_sec_admin_file(project_root)
     if not os.path.exists(admin_file):
+        print("[!] Администратор безопасности не настроен.")
         return False
         
-    try:
-        with open(admin_file, "r") as f:
-            data = json.load(f)
-            
-        key = hashlib.pbkdf2_hmac(
-            'sha256', 
-            password.encode('utf-8'), 
-            data["salt"].encode('utf-8'), 
-            100000
-        )
+    with open(admin_file, "r") as f:
+        data = json.load(f)
         
-        return key.hex() == data["admin_hash"]
-    except Exception:
+    # Печатаем через rich если он есть
+    print("\n[bold yellow]🔐 Авторизация администратора безопасности[/bold yellow]")
+    password = getpass.getpass("Введите пароль администратора: ")
+    
+    key = hashlib.pbkdf2_hmac(
+        'sha256', 
+        password.encode('utf-8'), 
+        data["salt"].encode('utf-8'), 
+        100000
+    )
+    
+    if key.hex() != data["admin_hash"]:
+        print("[bold red][!] Неверный пароль. Доступ запрещен.[/bold red]")
         return False
+        
+    return True
 
 def create_admin(project_root, password=None):
     """Создает нового администратора безопасности. Возвращает (login, password) или None."""
@@ -175,50 +176,6 @@ def create_admin(project_root, password=None):
     
     print(f"[green][+] Администратор безопасности успешно создан и защищен.[/green]")
     return (login, password)
-
-def update_admin_credentials(project_root, new_login, new_password):
-    """Обновляет учетные данные администратора (неинтерактивно)."""
-    admin_file = get_sec_admin_file(project_root)
-    
-    salt = secrets.token_hex(16)
-    key = hashlib.pbkdf2_hmac(
-        'sha256', 
-        new_password.encode('utf-8'), 
-        salt.encode('utf-8'), 
-        100000
-    )
-    
-    data = {
-        "admin_hash": key.hex(),
-        "salt": salt
-    }
-    
-    # Обновляем sec_admin.json
-    if os.path.exists(admin_file):
-        unlock_file(admin_file)
-    with open(admin_file, "w") as f:
-        json.dump(data, f)
-    lock_file(admin_file, intense=True)
-    
-    # Обновляем sec_config.py (только логин, убираем пароль)
-    config_path = os.path.join(project_root, "AEngineApps", "sec_config.py")
-    if os.path.exists(config_path):
-        try:
-            import re
-            with open(config_path, "r", encoding="utf-8") as f:
-                content = f.read()
-            
-            # Обновляем логин
-            content = re.sub(r'ADMIN_LOGIN = ".*"', f'ADMIN_LOGIN = "{new_login}"', content)
-            # Убираем пароль если он там был
-            content = re.sub(r'ADMIN_PASS = ".*"', 'ADMIN_PASS = "********"', content)
-            
-            with open(config_path, "w", encoding="utf-8") as f:
-                f.write(content)
-        except Exception:
-            pass
-            
-    return True
 
 def get_or_create_sign_key(project_root):
     """Генерирует или считывает ключ подписи проекта."""

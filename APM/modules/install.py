@@ -2,8 +2,6 @@ __help__ = "Установка программных модулей"
 __module_type__ = "МОДУЛИ"
 import os
 from rich import print
-from rich.table import Table
-from rich.panel import Panel
 from helpers import (
     assemble_module_package,
     clear_dir,
@@ -15,62 +13,6 @@ from helpers import (
     load_module_manifest,
     normalize_repo_url,
 )
-
-import subprocess
-
-def _process_install_commands(commands, title, warning=None):
-    if not commands:
-        return True
-
-    print(f"\n[bold cyan]--- {title} ---[/bold cyan]")
-    if warning:
-        print(f"[bold red]{warning}[/bold red]")
-
-    table = Table(show_header=True, header_style="bold magenta", box=None, padding=(0, 1))
-    table.add_column("#", style="dim", width=3)
-    table.add_column("Команда", style="white", overflow="fold")
-    
-    for i, cmd in enumerate(commands, 1):
-        table.add_row(str(i), cmd)
-    
-    print(table)
-    
-    print("\n[bold yellow]Выберите действие:[/bold yellow]")
-    print("  [green][A][/green] - Выполнить ВСЕ команды")
-    print("  [cyan][S][/cyan] - Выполнять пошагово (с подтверждением)")
-    print("  [red][C][/red] - Пропустить / Отмена")
-    
-    choice = (input("Ваш выбор [A/s/c]:") or "s").strip().lower()
-    
-    if choice in {"c", "n", "no"}:
-        print(f"[yellow][!] {title} пропущены.[/yellow]")
-        return True
-    
-    run_all = choice in {"a", "all", "в", "все"}
-    
-    for i, cmd in enumerate(commands, 1):
-        should_run = True
-        if not run_all:
-            confirm = (input(f"[{i}/{len(commands)}] Выполнить '{cmd}'? [Y/n/skip/abort]:") or "y").strip().lower()
-            if confirm == "abort":
-                print("[red][-] Установка прервана пользователем.[/red]")
-                return False
-            if confirm in {"n", "skip"}:
-                print(f"[yellow][!] Пропущено: {cmd}[/yellow]")
-                should_run = False
-        
-        if should_run:
-            print(f"[blue][*] ({i}/{len(commands)}) Выполнение: {cmd}[/blue]")
-            try:
-                subprocess.run(cmd, shell=True, check=True)
-                print("[green][+] Готово[/green]")
-            except Exception as e:
-                print(f"[red][-] Ошибка при выполнении: {e}[/red]")
-                cont = (input("Продолжить установку дальше? [Y/n]:") or "y").strip().lower()
-                if cont not in {"y", "yes", "д", "да"}:
-                    print("[red][-] Установка прервана.[/red]")
-                    return False
-    return True
 
 def run(base_dir, *args, **kwargs):
     arg:list = kwargs["args"]
@@ -90,6 +32,11 @@ def run(base_dir, *args, **kwargs):
         arg.remove("-l")
     if "--local" in arg:
         arg.remove("--local")
+    # Разбираем флаг области видимости ДО определения источника,
+    # иначе `apm install sec -g` примет "-g" за источник.
+    global_install = "-g" in arg
+    if global_install:
+        arg.remove("-g")
 
     if "--path" in arg:
         try:
@@ -124,11 +71,13 @@ def run(base_dir, *args, **kwargs):
         print("[red][-] Не удалось определить имя модуля из источника.[/red]")
         return
     
-    path = os.path.join(".apm", "installed")
-    if "-g" in arg:
-        arg.remove("-g")
+    # Локальная область — модули проекта (<cwd>/.apm/installed),
+    # глобальная (-g) — рядом с APM (APM/installed), доступна из любого проекта.
+    if global_install:
         path = os.path.join(base_dir, "installed")
-    
+    else:
+        path = os.path.join(os.getcwd(), ".apm", "installed")
+
     if not os.path.exists(path):
         try:
             os.makedirs(path, exist_ok=True)
@@ -159,9 +108,15 @@ def run(base_dir, *args, **kwargs):
 
     manifest = load_module_manifest(module_dir)
     if manifest:
-        copied = assemble_module_package(module_dir, os.getcwd(), manifest)
-        if copied:
-            print(f"[green][+] Файлы модуля собраны в проект: {len(copied)}[/green]")
+        # При глобальной установке файлы модуля НЕ копируются в текущий проект —
+        # глобально регистрируется только команда (доступная из любого проекта).
+        if global_install:
+            print("[cyan][i] Глобальная установка: команда доступна из любого проекта "
+                  "(файлы в текущий проект не копируются).[/cyan]")
+        else:
+            copied = assemble_module_package(module_dir, os.getcwd(), manifest)
+            if copied:
+                print(f"[green][+] Файлы модуля собраны в проект: {len(copied)}[/green]")
 
         installed, failed = install_python_dependencies(manifest.get("dependencies", {}).get("python", []))
         if installed:
@@ -175,17 +130,10 @@ def run(base_dir, *args, **kwargs):
                 print("[red][-] Установка прервана пользователем.[/red]")
                 return
 
-        if not _process_install_commands(
-            manifest.get("dependencies", {}).get("system", []),
-            "Системные шаги / зависимости"
-        ):
-            return
-
-        if not _process_install_commands(
-            manifest.get("install_commands", []),
-            "Команды установки модуля",
-            warning="[!] ВНИМАНИЕ: Проверьте команды перед запуском. Они могут изменить вашу систему."
-        ):
-            return
+        system_requirements = manifest.get("dependencies", {}).get("system", [])
+        if system_requirements:
+            print("[yellow][!] Требуются ручные системные шаги:[/yellow]")
+            for item in system_requirements:
+                print(f"[yellow]    - {item}[/yellow]")
     
     print("[green][+] Модуль установлен[/green]")

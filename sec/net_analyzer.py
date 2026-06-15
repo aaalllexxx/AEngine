@@ -21,12 +21,6 @@ class NetworkAnalyzer:
 
     def attach(self, app):
         """Автоматическая интеграция с приложением."""
-        try:
-            import AEngineApps.sec_config as sec_config
-            if not getattr(sec_config, "MODULES_STATUS", {}).get("net_analyzer", True):
-                return
-        except ImportError: pass
-
         app.before_request(self._auto_scan_hook)
 
     def _auto_scan_hook(self):

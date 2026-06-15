@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ title }}</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+<div class="wrap">
+    <h1>AEngine <span>Security Demo</span></h1>
+    <p class="sub">Намеренно уязвимый стенд для проверки модуля защиты sec (IDS/IPS).</p>
+    <p class="hint">
+        Дашборд безопасности: <a class="dash" href="/sec-admin">/sec-admin</a> (admin / admin).
+        На вкладке «Модули» включайте/выключайте защиту и наблюдайте разницу.
+        Авто-проверка: <code>python attack_test.py</code>.
+    </p>
+
+    <div class="card">
+        <h3>1. SQL-инъекция <span class="tag">SQLi</span></h3>
+        <p class="hint">Попробуйте логин <code>admin' OR '1'='1</code> с любым паролем.</p>
+        <form id="f-login">
+            <label>Логин</label><input name="login" value="admin' OR '1'='1' --">
+            <label>Пароль</label><input name="password" value="x">
+            <button type="submit">Войти</button>
+        </form>
+        <pre id="out-login"></pre>
+    </div>
+
+    <div class="card">
+        <h3>2. Межсайтовый скриптинг <span class="tag">XSS</span></h3>
+        <p class="hint">Параметр <code>q</code> отражается в HTML без экранирования.</p>
+        <form id="f-search">
+            <label>Поисковый запрос</label><input name="q" value="&lt;script&gt;alert(1)&lt;/script&gt;">
+            <button type="submit">Искать</button>
+        </form>
+        <pre id="out-search"></pre>
+    </div>
+
+    <div class="card">
+        <h3>3. Выполнение команд <span class="tag">RCE</span></h3>
+        <p class="hint">Параметр <code>host</code> попадает в shell-команду.</p>
+        <form id="f-exec">
+            <label>Хост</label><input name="host" value="127.0.0.1; whoami">
+            <button type="submit">Пинг</button>
+        </form>
+        <pre id="out-exec"></pre>
+    </div>
+
+    <div class="card">
+        <h3>4. Чтение файлов <span class="tag">LFI</span></h3>
+        <p class="hint">Параметр <code>path</code> не проверяется. Попробуйте <code>secret_flag.txt</code>.</p>
+        <form id="f-read">
+            <label>Путь к файлу</label><input name="path" value="secret_flag.txt">
+            <button type="submit">Прочитать</button>
+        </form>
+        <pre id="out-read"></pre>
+    </div>
+</div>
+
+<script>
+function show(id, data, status) {
+    document.getElementById(id).textContent = "HTTP " + status + "\n" +
+        (typeof data === "string" ? data : JSON.stringify(data, null, 2));
+}
+async function send(formId, url, method, outId) {
+    const form = document.getElementById(formId);
+    const fd = new FormData(form);
+    let res, body;
+    try {
+        if (method === "GET") {
+            const qs = new URLSearchParams(fd).toString();
+            res = await fetch(url + "?" + qs);
+        } else {
+            res = await fetch(url, { method: "POST", body: new URLSearchParams(fd) });
+        }
+        const ct = res.headers.get("content-type") || "";
+        body = ct.includes("application/json") ? await res.json() : await res.text();
+        show(outId, body, res.status);
+    } catch (e) { show(outId, String(e), "ERR"); }
+}
+document.getElementById("f-login").addEventListener("submit", e => { e.preventDefault(); send("f-login", "/api/login", "POST", "out-login"); });
+document.getElementById("f-search").addEventListener("submit", e => { e.preventDefault(); send("f-search", "/api/search", "GET", "out-search"); });
+document.getElementById("f-exec").addEventListener("submit", e => { e.preventDefault(); send("f-exec", "/api/exec", "GET", "out-exec"); });
+document.getElementById("f-read").addEventListener("submit", e => { e.preventDefault(); send("f-read", "/api/readfile", "GET", "out-read"); });
+</script>
+</body>
+</html>

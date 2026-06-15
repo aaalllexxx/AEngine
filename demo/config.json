@@ -1,0 +1,10 @@
+{
+    "host": "127.0.0.1",
+    "port": 5057,
+    "view": "web",
+    "routers": "auto",
+    "screen_path": "screens",
+    "services": "auto",
+    "services_path": "services",
+    "debug": false
+}

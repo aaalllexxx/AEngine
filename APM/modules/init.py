@@ -15,7 +15,7 @@ def run(base_dir, gconf_path, *args, **kwargs):
         print("Usage: apm init")
         return
     
-    if os.path.exists(".apm/run.json"):
+    if os.path.exists(".apm"):
         print("[yellow][!] Проект уже инициализирован. Перезаписать конфигурацию? [д/н][/yellow]")
         ans = input("")
         if "д" not in ans and "y" not in ans:

@@ -49,9 +49,14 @@ MODULE_MAP = {
         "description": "Продвинутая защита: сканер процессов, конфигураций, пользователей",
     },
     "dashboard": {
-        "sources": ["services/dashboard.py"],
-        "target": "services/sec_dashboard.py",
-        "description": "Админ-панель безопасности с авторизацией и управлением модулями",
+        "sources": ["dashboard.py"],
+        "target": "AEngineApps/dashboard.py",
+        "description": "Админ-панель безопасности с авторизацией (требует шаблоны и конфиг)",
+    },
+    "security": {
+        "sources": ["security.py"],
+        "target": "AEngineApps/security.py",
+        "description": "Менеджер безопасности: единая точка интеграции + вкл/выкл модулей",
     },
     "cluster": {
         "sources": ["cluster.py"],
@@ -67,11 +72,6 @@ MODULE_MAP = {
         "sources": ["unsign.py"],
         "target": "AEngineApps/unsign.py",
         "description": "Снятие электронной подписи и разблокировка файлов",
-    },
-    "sec_auth": {
-        "sources": ["auth.py"],
-        "target": "AEngineApps/sec_auth.py",
-        "description": "Ядро авторизации администратора (Hashed Auth)",
     },
 }
 
@@ -128,19 +128,7 @@ def _setup_credentials(base_dir, login=None, password=None):
     config_content = f"""# Автоматически сгенерированный конфиг безопасности sec
 # Этот файл защищен подписью и атрибутом Read-Only
 ADMIN_LOGIN = "{login}"
-
-# Статус модулей безопасности (True - включен, False - выключен)
-MODULES_STATUS = {{
-    "intrusion": True,
-    "logs": True,
-    "code_signer": True,
-    "os_protect": True,
-    "net_analyzer": True,
-    "sys_protect": True,
-    "dashboard": True,
-    "cluster": True,
-    "auto_cluster": True,
-}}
+ADMIN_PASS = "{password}"
 """
     config_path = os.path.join(base_dir, "AEngineApps", "sec_config.py")
     os.makedirs(os.path.dirname(config_path), exist_ok=True)
@@ -177,6 +165,40 @@ def _copy_templates(base_dir):
             for subitem in os.listdir(s):
                 shutil.copy2(os.path.join(s, subitem), os.path.join(d, subitem))
             print(f"  [green]✓[/green] Папка шаблонов {item} скопирована")
+
+
+SERVICE_WIRING = '''"""Авто-подключение дашборда безопасности sec.
+
+Файл сгенерирован `apm sec init`. AEngine авто-обнаруживает экземпляры Service
+в каталоге services/ (config.json: "services": "auto") и регистрирует их.
+"""
+from AEngineApps.dashboard import SecDashboardService
+
+# Дашборд доступен по адресу /sec-admin
+sec_dashboard_service = SecDashboardService(prefix="/sec-admin")
+'''
+
+
+def _install_service_wiring(base_dir):
+    """Создаёт services/sec_dashboard.py для авто-регистрации дашборда."""
+    services_dir = os.path.join(base_dir, "services")
+    os.makedirs(services_dir, exist_ok=True)
+    target = os.path.join(services_dir, "sec_dashboard.py")
+    with open(target, "w", encoding="utf-8") as f:
+        f.write(SERVICE_WIRING)
+    print(f"  [green]✓[/green] Сервис дашборда -> services/sec_dashboard.py")
+
+
+def _write_default_module_config(base_dir):
+    """Создаёт sec_modules.json (все модули включены), если его ещё нет."""
+    import json
+    config_path = os.path.join(base_dir, "sec_modules.json")
+    if os.path.exists(config_path):
+        return
+    default = {"intrusion": True, "os_protect": True, "net_analyzer": True, "sys_protect": True}
+    with open(config_path, "w", encoding="utf-8") as f:
+        json.dump(default, f, indent=2, ensure_ascii=False)
+    print(f"  [green]✓[/green] Конфиг модулей -> sec_modules.json")
 
 
 def _install_module(base_dir, name: str) -> bool:
@@ -257,6 +279,8 @@ def run(*args, **kwargs):
         else:
              _setup_credentials(base_dir)
         _copy_templates(base_dir)
+        _install_service_wiring(base_dir)
+        _write_default_module_config(base_dir)
 
     target_modules = ALL_MODULES
     if "--modules" in arg:
@@ -271,8 +295,15 @@ def run(*args, **kwargs):
     for name in target_modules:
         if _install_module(base_dir, name):
             installed += 1
-            
+
     print(f"\n[green bold]Готово![/green bold] Установлено модулей: {installed}")
+    print(
+        "\n[bold cyan]Подключение защиты к приложению[/bold cyan] (в main.py):\n"
+        "  [white]from AEngineApps.security import Security[/white]\n"
+        "  [white]Security(app).enable()  # перед app.run()[/white]\n"
+        "Дашборд: [green]/sec-admin[/green] · модули вкл/выкл — на вкладке «Модули».\n"
+        "В config.json включите авто-сервисы: [white]\"services\": \"auto\"[/white]."
+    )
 
 
 def _print_help():

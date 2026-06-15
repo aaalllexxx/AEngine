@@ -1,0 +1,6 @@
+{
+  "intrusion": true,
+  "os_protect": true,
+  "net_analyzer": true,
+  "sys_protect": true
+}

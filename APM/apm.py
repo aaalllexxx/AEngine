@@ -35,16 +35,53 @@ def _manifest_path(module_dir):
     return os.path.join(module_dir, "apm-module.json")
 
 
-def _load_local_aliases():
-    aliases = {}
-    local_installed_dir = os.path.join(os.getcwd(), ".apm", "installed")
-    if not os.path.isdir(local_installed_dir):
-        return aliases
+def _local_installed_dir():
+    """Локальная область видимости: модули проекта в <cwd>/.apm/installed/."""
+    return os.path.join(os.getcwd(), ".apm", "installed")
 
-    for name in os.listdir(local_installed_dir):
-        mod_dir = os.path.join(local_installed_dir, name)
-        if not os.path.isdir(mod_dir):
+
+def _global_installed_dir():
+    """Глобальная область видимости: модули рядом с APM (APM/installed/)."""
+    return os.path.join(base_dir, install_module_path)
+
+
+# Области видимости в порядке приоритета (локальная перекрывает глобальную).
+INSTALLED_SCOPES = (
+    ("local", _local_installed_dir, "ЛОКАЛЬНЫЕ ПЛАГИНЫ"),
+    ("global", _global_installed_dir, "ГЛОБАЛЬНЫЕ ПЛАГИНЫ"),
+)
+
+
+def _iter_installed_module_dirs():
+    """Перебирает установленные модули: сначала локальные, затем глобальные.
+
+    Возвращает кортежи (scope, module_type, module_name, module_dir).
+    Вызывающий код сам решает, пропускать ли дубликаты по имени
+    (локальный модуль имеет приоритет над глобальным).
+    """
+    for scope, dir_fn, module_type in INSTALLED_SCOPES:
+        root = dir_fn()
+        if not os.path.isdir(root):
             continue
+        for name in sorted(os.listdir(root)):
+            mod_dir = os.path.join(root, name)
+            if os.path.isdir(mod_dir):
+                yield scope, module_type, name, mod_dir
+
+
+def _find_installed_module_dir(module_name):
+    """Ищет каталог установленного модуля сначала локально, затем глобально."""
+    for _, dir_fn, _ in INSTALLED_SCOPES:
+        candidate = os.path.join(dir_fn(), module_name)
+        if os.path.isdir(candidate):
+            return candidate
+    return None
+
+
+def _load_installed_aliases():
+    """Собирает alias'ы из локальных и глобальных модулей (локальные в приоритете)."""
+    aliases = {}
+    for _, _, name, mod_dir in _iter_installed_module_dirs():
         manifest = _read_json_file(_manifest_path(mod_dir), default={})
         for item in manifest.get("aliases", []):
             if not isinstance(item, dict):
@@ -52,6 +89,8 @@ def _load_local_aliases():
             alias_name = item.get("name")
             subcommand = item.get("subcommand") or item.get("command")
             if not alias_name or not subcommand:
+                continue
+            if alias_name in aliases:  # локальный alias уже найден — он главнее
                 continue
             aliases[alias_name] = {
                 "module": item.get("module") or name,
@@ -61,19 +100,19 @@ def _load_local_aliases():
     return aliases
 
 
-def _run_local_module_command(module_name, command_args):
-    local_module_dir = os.path.join(os.getcwd(), ".apm", "installed", module_name)
-    if not os.path.exists(local_module_dir):
+def _run_installed_module_command(module_name, command_args):
+    module_dir = _find_installed_module_dir(module_name)
+    if module_dir is None:
         print(f"Команда '{module_name}' не найдена.")
         print("  Используйте 'apm --help' для списка доступных команд.")
         sys.exit(1)
 
     if len(command_args) < 2:
-        module_file = os.path.join(local_module_dir, "init.py")
+        module_file = os.path.join(module_dir, "init.py")
         if not os.path.exists(module_file):
-            module_file = os.path.join(local_module_dir, "__init__.py")
+            module_file = os.path.join(module_dir, "__init__.py")
     else:
-        module_file = os.path.join(local_module_dir, command_args[1] + ".py")
+        module_file = os.path.join(module_dir, command_args[1] + ".py")
 
     if not os.path.exists(module_file):
         print(f"Команда '{module_name}' не найдена.")
@@ -81,8 +120,8 @@ def _run_local_module_command(module_name, command_args):
         sys.exit(1)
 
     added_path = False
-    if local_module_dir not in sys.path:
-        sys.path.append(local_module_dir)
+    if module_dir not in sys.path:
+        sys.path.append(module_dir)
         added_path = True
 
     try:
@@ -92,8 +131,8 @@ def _run_local_module_command(module_name, command_args):
         else:
             print(f"[!] В модуле {module_file} не найдена функция run()")
     finally:
-        if added_path and local_module_dir in sys.path:
-            sys.path.remove(local_module_dir)
+        if added_path and module_dir in sys.path:
+            sys.path.remove(module_dir)
 
 def get_commands():
     """Загружает доступные команды и группирует их."""
@@ -114,40 +153,36 @@ def get_commands():
             except Exception as e:
                 commands[name] = {"help": f"[ошибка загрузки: {e}]", "type": "ОШИБКИ"}
 
-    # 2. Загрузка локальных пользовательских модулей (.apm/installed/)
-    local_installed_dir = os.path.join(os.getcwd(), ".apm", "installed")
-    if os.path.isdir(local_installed_dir):
-        for name in os.listdir(local_installed_dir):
-            mod_dir = os.path.join(local_installed_dir, name)
-            if not os.path.isdir(mod_dir):
-                continue
-            
-            # Пропускаем, если такой модуль уже есть (встроенный имеет приоритет)
-            if name in commands:
-                continue
-                
-            # Ищем точку входа (init.py или __init__.py)
-            entry_file = os.path.join(mod_dir, "init.py")
-            if not os.path.exists(entry_file):
-                entry_file = os.path.join(mod_dir, "__init__.py")
-                
-            if os.path.exists(entry_file):
-                try:
-                    added_path = False
-                    if mod_dir not in sys.path:
-                        sys.path.append(mod_dir)
-                        added_path = True
-                    mod = _load_module_from_file(f"local_{name}", entry_file)
-                    desc = getattr(mod, "__help__", f"Локальный модуль {name}")
-                    mod_type = getattr(mod, "__module_type__", "ЛОКАЛЬНЫЕ ПЛАГИНЫ")
-                    commands[name] = {"help": desc, "type": mod_type}
-                except Exception as e:
-                    commands[name] = {"help": f"[ошибка локального модуля: {e}]", "type": "ОШИБКИ"}
-                finally:
-                    if added_path and mod_dir in sys.path:
-                        sys.path.remove(mod_dir)
+    # 2. Загрузка установленных пользовательских модулей:
+    #    сначала локальные (.apm/installed/), затем глобальные (APM/installed/).
+    #    Приоритет: встроенные > локальные > глобальные (дубли по имени пропускаются).
+    for scope, default_type, name, mod_dir in _iter_installed_module_dirs():
+        # Пропускаем, если такой модуль уже зарегистрирован (встроенный/локальный главнее)
+        if name in commands:
+            continue
 
-    for alias_name, alias_data in _load_local_aliases().items():
+        # Ищем точку входа (init.py или __init__.py)
+        entry_file = os.path.join(mod_dir, "init.py")
+        if not os.path.exists(entry_file):
+            entry_file = os.path.join(mod_dir, "__init__.py")
+
+        if os.path.exists(entry_file):
+            try:
+                added_path = False
+                if mod_dir not in sys.path:
+                    sys.path.append(mod_dir)
+                    added_path = True
+                mod = _load_module_from_file(f"{scope}_{name}", entry_file)
+                desc = getattr(mod, "__help__", f"Модуль {name} ({scope})")
+                mod_type = getattr(mod, "__module_type__", default_type)
+                commands[name] = {"help": desc, "type": mod_type}
+            except Exception as e:
+                commands[name] = {"help": f"[ошибка модуля {scope}: {e}]", "type": "ОШИБКИ"}
+            finally:
+                if added_path and mod_dir in sys.path:
+                    sys.path.remove(mod_dir)
+
+    for alias_name, alias_data in _load_installed_aliases().items():
         if alias_name in commands:
             continue
         commands[alias_name] = {
@@ -233,7 +268,7 @@ if __name__ == "__main__":
     try:
         executable = sys.argv[1]
         args = sys.argv[1:]
-        aliases = _load_local_aliases()
+        aliases = _load_installed_aliases()
         
         if executable in ("-h", "--help", "help"):
             print_help(get_commands())
@@ -242,7 +277,7 @@ if __name__ == "__main__":
                 alias_data = aliases[executable]
                 try:
                     alias_args = [alias_data["module"], alias_data["subcommand"], *args[1:]]
-                    _run_local_module_command(alias_data["module"], alias_args)
+                    _run_installed_module_command(alias_data["module"], alias_args)
                 except ModuleNotFoundError as inner_e:
                     import traceback
                     print(f"[!] Ошибка зависимости при загрузке alias '{executable}': отсутствует модуль '{inner_e.name}'")
@@ -260,9 +295,9 @@ if __name__ == "__main__":
                 # (не хватает зависимости).
                 expected_module = f"{module_path}.{executable}"
                 if e.name == expected_module or e.name == executable:
-                    # Модуль APM не найден — пробуем загрузить как локальный (.apm/installed/)
+                    # Модуль APM не найден — пробуем как установленный (локальный/глобальный)
                     try:
-                        _run_local_module_command(executable, args)
+                        _run_installed_module_command(executable, args)
                     
                     except ModuleNotFoundError as inner_e:
                         import traceback

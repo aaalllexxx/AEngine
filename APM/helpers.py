@@ -48,12 +48,7 @@ KNOWN_REPOS = {
 
 ARCHIVE_EXTENSIONS = (".zip", ".tar", ".tar.gz", ".tgz", ".tar.bz2", ".tbz2", ".tar.xz", ".txz")
 MANIFEST_NAME = "apm-module.json"
-IGNORED_BUILD_DIRS = {
-    ".git", "__pycache__", ".pytest_cache", ".mypy_cache", "htmlcov", 
-    ".venv", "venv", "env", "node_modules", "dist", "build", ".next", 
-    ".nuxt", ".idea", ".vscode", ".DS_Store", "target", "out", "bower_components",
-    "logs", "data", "temp", "tmp"
-}
+IGNORED_BUILD_DIRS = {".git", "__pycache__", ".pytest_cache", ".mypy_cache", "htmlcov", ".venv", "venv", "env"}
 STD_LIB_MODULES = set(getattr(sys, "stdlib_module_names", set()))
 TOP_LEVEL_PACKAGE_DIRS = {"AEngineApps", "services", "templates", "APM"}
 
@@ -270,7 +265,7 @@ def install_module_source(source, target_dir, local_source=None):
     return materialize_repo_snapshot(normalized, target_dir, local_source=local_source)
 
 
-def build_module_archive(source_dir, output_path, interactive=True, auto_aliases=False, auto_dependencies=False, auto_services=False):
+def build_module_archive(source_dir, output_path, interactive=True, auto_aliases=False, auto_dependencies=False):
     source_dir = expand_local_path(source_dir)
     output_path = expand_local_path(output_path)
     if not os.path.isdir(source_dir):
@@ -281,7 +276,6 @@ def build_module_archive(source_dir, output_path, interactive=True, auto_aliases
         interactive=interactive,
         auto_aliases=auto_aliases,
         auto_dependencies=auto_dependencies,
-        auto_services=auto_services,
     )
     os.makedirs(os.path.dirname(output_path), exist_ok=True)
     with open(os.path.join(source_dir, MANIFEST_NAME), "w", encoding="utf-8") as manifest_file:
@@ -291,45 +285,167 @@ def build_module_archive(source_dir, output_path, interactive=True, auto_aliases
     with zipfile.ZipFile(output_path, "w", compression=zipfile.ZIP_DEFLATED) as archive:
         archive.writestr(MANIFEST_NAME, json.dumps(manifest, indent=2, ensure_ascii=False) + "\n")
 
-        # Лимит размера файла для включения в сборку (50МБ)
-        MAX_FILE_SIZE = 50 * 1024 * 1024 
-
         for root, dirnames, filenames in os.walk(source_dir):
             rel_root = os.path.relpath(root, source_dir)
             if rel_root == ".":
                 rel_root = ""
 
-            # Убираем рекурсию в нежелательные папки на корню
             dirnames[:] = [
                 dirname for dirname in dirnames
-                if dirname not in IGNORED_BUILD_DIRS and not dirname.startswith(".")
+                if dirname not in IGNORED_BUILD_DIRS
             ]
 
             for filename in filenames:
                 if filename.endswith((".pyc", ".pyo")) or filename in {".coverage", MANIFEST_NAME}:
                     continue
-                
-                # Исключаем архивы (чтобы не было рекурсии архива в архиве)
-                if filename.endswith((".zip", ".tar.gz", ".apm.zip")):
-                    continue
-
                 src = os.path.join(root, filename)
                 rel_path = posixpath.join(rel_root.replace("\\", "/"), filename) if rel_root else filename
-                
-                # Пропускаем целевой файл, если он вдруг в источнике
-                if os.path.abspath(src) == os.path.abspath(output_path):
-                    continue
-                
-                try:
-                    if os.path.getsize(src) > MAX_FILE_SIZE:
-                        print(f"[yellow][!] Файл слишком велик и будет пропущен: {rel_path} ({os.path.getsize(src)//(1024*1024)}MB)[/yellow]")
-                        continue
-                except OSError:
-                    continue
-
                 archive.write(src, rel_path)
 
     return output_path
+
+
+# Импортируемое имя -> имя пакета на PyPI (для корректного requirements.txt).
+IMPORT_TO_PACKAGE = {
+    "webview": "pywebview",
+    "PIL": "Pillow",
+    "cv2": "opencv-python",
+    "yaml": "PyYAML",
+    "bs4": "beautifulsoup4",
+    "dotenv": "python-dotenv",
+    "jwt": "PyJWT",
+    "psycopg2": "psycopg2-binary",
+}
+
+
+def _project_port(project_dir, default=8000):
+    """Достаёт порт из config.json проекта (если есть)."""
+    for candidate in ("config.json", os.path.join("AEngineApps", "config.json")):
+        data = _safe_read_json(os.path.join(project_dir, candidate), default=None)
+        if isinstance(data, dict) and data.get("port"):
+            try:
+                return int(data["port"])
+            except (TypeError, ValueError):
+                continue
+    return default
+
+
+def _project_entrypoint(project_dir):
+    """Определяет команду запуска и факт использования async (Quart)."""
+    main_py = os.path.join(project_dir, "main.py")
+    uses_quart = False
+    deps = set(detect_python_dependencies(project_dir))
+    if "quart" in {d.lower() for d in deps}:
+        uses_quart = True
+    has_main = os.path.exists(main_py)
+    return has_main, uses_quart
+
+
+def generate_requirements(project_dir):
+    """Список зависимостей проекта с маппингом импорт->пакет, плюс рантайм по умолчанию."""
+    detected = detect_python_dependencies(project_dir)
+    packages = []
+    seen = set()
+    for dep in detected:
+        # requirements.txt мог содержать строку с версией (flask==3.0.0) — оставляем как есть.
+        base = dep.split("==")[0].split(">=")[0].split("<=")[0].strip()
+        package = IMPORT_TO_PACKAGE.get(base, dep)
+        key = package.split("==")[0].lower()
+        if key in seen:
+            continue
+        seen.add(key)
+        packages.append(package)
+    # Гарантируем наличие веб-рантайма.
+    if "flask" not in seen:
+        packages.append("flask")
+    return sorted(packages)
+
+
+def generate_docker_artifacts(project_dir, output_dir=None, force=False, port=None):
+    """Генерирует requirements.txt, Dockerfile и docker-compose.yml для деплоя проекта.
+
+    Возвращает (created, skipped) — списки путей.
+    """
+    project_dir = expand_local_path(project_dir)
+    if not os.path.isdir(project_dir):
+        raise FileNotFoundError(project_dir)
+    output_dir = expand_local_path(output_dir) if output_dir else project_dir
+    os.makedirs(output_dir, exist_ok=True)
+
+    if port is None:
+        port = _project_port(project_dir)
+    has_main, uses_quart = _project_entrypoint(project_dir)
+
+    requirements = generate_requirements(project_dir)
+    if uses_quart and "hypercorn" not in {r.lower() for r in requirements}:
+        requirements.append("hypercorn")
+        requirements = sorted(requirements)
+
+    requirements_body = "\n".join(requirements) + "\n"
+
+    if uses_quart:
+        run_cmd = f'CMD ["hypercorn", "main:app.quart", "--bind", "0.0.0.0:{port}", "--workers", "4"]'
+    elif has_main:
+        run_cmd = 'CMD ["python", "main.py"]'
+    else:
+        run_cmd = f'CMD ["python", "-m", "AEngineApps"]  # TODO: укажите точку входа'
+
+    dockerfile_body = f"""# Dockerfile сгенерирован `apm build docker`
+FROM python:3.11-slim
+
+WORKDIR /app
+
+# Системные зависимости (минимум для сборки колёс)
+RUN apt-get update && apt-get install -y --no-install-recommends gcc \\
+    && rm -rf /var/lib/apt/lists/*
+
+# Сначала зависимости (для кеширования слоёв)
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Затем код приложения
+COPY . .
+
+# Непривилегированный пользователь
+RUN useradd -m -u 1000 appuser && chown -R appuser:appuser /app
+USER appuser
+
+EXPOSE {port}
+
+# ВАЖНО: в config.json укажите "host": "0.0.0.0" и "view": "web" для запуска в контейнере.
+{run_cmd}
+"""
+
+    compose_body = f"""# docker-compose.yml сгенерирован `apm build docker`
+services:
+  app:
+    build: .
+    ports:
+      - "{port}:{port}"
+    environment:
+      - ENV=production
+    volumes:
+      - ./logs:/app/logs
+    restart: unless-stopped
+"""
+
+    targets = {
+        "requirements.txt": requirements_body,
+        "Dockerfile": dockerfile_body,
+        "docker-compose.yml": compose_body,
+    }
+
+    created, skipped = [], []
+    for filename, body in targets.items():
+        path = os.path.join(output_dir, filename)
+        if os.path.exists(path) and not force:
+            skipped.append(path)
+            continue
+        with open(path, "w", encoding="utf-8") as f:
+            f.write(body)
+        created.append(path)
+
+    return created, skipped
 
 
 def _safe_read_json(path, default=None):
@@ -498,98 +614,66 @@ def _merge_unique_strings(base_items, extra_items):
     return result
 
 
-def _prompt_review_list(title, current_items, prompt_text):
-    """
-    Displays current items and allowed editing (+/-).
-    Returns the final list.
-    """
-    items = list(current_items or [])
+def _prompt_lines(title, prompt_text):
+    print(title)
+    items = []
     while True:
-        print(f"\n[bold cyan]--- {title} ---[/bold cyan]")
-        if not items:
-            print("  [dim]Список пуст[/dim]")
-        else:
-            for item in sorted(items):
-                print(f"  [green]•[/green] {item}")
-        
-        print(f"\n[dim]Введите имя для добавления, -имя для удаления. Пустая строка для подтверждения.[/dim]")
         value = input(prompt_text).strip()
         if not value:
             break
-        
-        if value.startswith("-"):
-            to_remove = value[1:].strip()
-            if to_remove in items:
-                items.remove(to_remove)
-                print(f"[red][-] Удалено: {to_remove}[/red]")
-            else:
-                print(f"[yellow][!] Не найдено: {to_remove}[/yellow]")
-        else:
-            to_add = value.strip("+ ").strip()
-            if to_add and to_add not in items:
-                items.append(to_add)
-                print(f"[green][+] Добавлено: {to_add}[/green]")
-    return sorted(items)
+        items.append(value)
+    return items
 
 
 def _prompt_manifest_enhancements(manifest):
-    # 1. Review Aliases
-    aliases = list(manifest.get("aliases", []))
-    while True:
-        print(f"\n[bold cyan]--- Список Alias'ов модуля ---[/bold cyan]")
-        if not aliases:
-            print("  [dim]Alias'ы не обнаружены[/dim]")
-        else:
-            for al in sorted(aliases, key=lambda x: x["name"]):
-                print(f"  [green]•[/green] [bold]{al['name']}[/bold] -> {al['subcommand']}")
-        
-        print(f"\n[dim]Формат: alias=subcommand для добавления, -alias для удаления. Пустая строка для подтверждения.[/dim]")
-        value = input("alias ->").strip()
-        if not value:
-            break
-        
-        if value.startswith("-"):
-            name_to_remove = value[1:].strip()
-            new_aliases = [a for a in aliases if a["name"] != name_to_remove]
-            if len(new_aliases) < len(aliases):
-                aliases = new_aliases
-                print(f"[red][-] Удален alias: {name_to_remove}[/red]")
-            else:
-                print(f"[yellow][!] Alias не найден: {name_to_remove}[/yellow]")
-        elif "=" in value:
-            parts = [p.strip() for p in value.split("=", 1)]
-            if len(parts) == 2:
-                name, sub = parts
-                # Удаляем старый если есть с таким же именем
-                aliases = [a for a in aliases if a["name"] != name]
-                aliases.append({
-                    "name": name,
-                    "module": manifest["name"],
-                    "subcommand": sub,
-                    "help": f"Alias для `apm {manifest['name']} {sub}`"
-                })
-                print(f"[green][+] Добавлен alias: {name} -> {sub}[/green]")
-        else:
-            print("[yellow][!] Используйте формат name=subcommand или -name[/yellow]")
-
-    manifest["aliases"] = aliases
-
-    # 2. Review Python Deps
-    manifest["dependencies"]["python"] = _prompt_review_list(
-        "Python-зависимости",
-        manifest["dependencies"]["python"],
-        "python dep ->"
+    extra_aliases = []
+    alias_lines = _prompt_lines(
+        "Alias'ы модуля: по одному на строку в формате alias=subcommand. Пустая строка завершает ввод.",
+        "alias ->",
     )
+    for chunk in alias_lines:
+        if "=" not in chunk:
+            continue
+        alias_name, subcommand = [item.strip() for item in chunk.split("=", 1)]
+        if not alias_name or not subcommand:
+            continue
+        extra_aliases.append(
+            {
+                "name": alias_name,
+                "module": manifest["name"],
+                "subcommand": subcommand,
+                "help": f"Alias для `apm {manifest['name']} {subcommand}`",
+            }
+        )
+    if extra_aliases:
+        existing = {(item["name"], item["subcommand"]) for item in manifest["aliases"]}
+        for alias in extra_aliases:
+            key = (alias["name"], alias["subcommand"])
+            if key not in existing:
+                manifest["aliases"].append(alias)
 
-    # 3. Review System Steps
-    manifest["dependencies"]["system"] = _prompt_review_list(
-        "Системные зависимости / ручные шаги",
-        manifest["dependencies"]["system"],
-        "system step ->"
+    extra_python = _prompt_lines(
+        "Дополнительные Python-зависимости: по одной на строку. Пустая строка завершает ввод.",
+        "python dep ->",
     )
+    if extra_python:
+        manifest["dependencies"]["python"] = _merge_unique_strings(
+            manifest["dependencies"]["python"],
+            extra_python,
+        )
+
+    extra_system = _prompt_lines(
+        "Системные зависимости или ручные шаги: по одному на строку. Пустая строка завершает ввод.",
+        "system step ->",
+    )
+    if extra_system:
+        manifest["dependencies"]["system"] = _merge_unique_strings(
+            manifest["dependencies"]["system"],
+            extra_system,
+        )
 
 
-def build_module_manifest(source_dir, interactive=True, auto_aliases=False, auto_dependencies=False, auto_services=False):
+def build_module_manifest(source_dir, interactive=True, auto_aliases=False, auto_dependencies=False):
     source_dir = expand_local_path(source_dir)
     module_name = os.path.basename(source_dir.rstrip("/\\"))
     manifest_path = os.path.join(source_dir, MANIFEST_NAME)
@@ -613,10 +697,10 @@ def build_module_manifest(source_dir, interactive=True, auto_aliases=False, auto
             "local_module_dir": ".",
         },
         "contents": {
-            "aengine_apps": _walk_relative_files(os.path.join(source_dir, "AEngineApps")) if auto_services or interactive else existing_manifest.get("contents", {}).get("aengine_apps", []),
-            "services": _walk_relative_files(os.path.join(source_dir, "services")) if auto_services or interactive else existing_manifest.get("contents", {}).get("services", []),
-            "apm_modules": _walk_relative_files(os.path.join(source_dir, "APM", "modules")) if auto_services or interactive else existing_manifest.get("contents", {}).get("apm_modules", []),
-            "templates": _walk_relative_files(os.path.join(source_dir, "templates")) if auto_services or interactive else existing_manifest.get("contents", {}).get("templates", []),
+            "aengine_apps": _walk_relative_files(os.path.join(source_dir, "AEngineApps")),
+            "services": _walk_relative_files(os.path.join(source_dir, "services")),
+            "apm_modules": _walk_relative_files(os.path.join(source_dir, "APM", "modules")),
+            "templates": _walk_relative_files(os.path.join(source_dir, "templates")),
             "local_modules": _walk_relative_files(source_dir),
         },
         "commands": commands,
@@ -626,7 +710,6 @@ def build_module_manifest(source_dir, interactive=True, auto_aliases=False, auto
             "system": existing_manifest.get("dependencies", {}).get("system", []),
             "local_modules": existing_manifest.get("dependencies", {}).get("local_modules", []),
         },
-        "install_commands": existing_manifest.get("install_commands", []),
         "notes": existing_manifest.get("notes", []),
         "install": {
             "copy_to_project": True,
